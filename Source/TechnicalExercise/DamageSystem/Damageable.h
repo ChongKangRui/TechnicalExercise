@@ -22,6 +22,9 @@ public:
 	void ApplyDamage(const float DamageValue);
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Damage")
+	void RefillHealth();
+
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Damage")
 	float GetHealth() const;
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Damage")

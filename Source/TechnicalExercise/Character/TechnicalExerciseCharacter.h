@@ -25,33 +25,38 @@ struct FCharacterBaseAttribute : public FTableRowBase {
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Base Attribute")
-	float MaxHealth = 100.0f;
+	float MaxHealth;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Base Attribute")
-	float MaxStamina = 100.0f;
+	float MaxStamina;
 
 	/*Stamina Refill Speed per seconds*/
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Base Attribute")
-	float StaminaRefillSpeed = 5.0f;
+	float StaminaRefillSpeed;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Base Attribute")
-	float WalkSpeed = 500.0f;
+	float WalkSpeed;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Base Attribute")
-	float SprintSpeed = 900.0f;
+	float SprintSpeed;
 
 	/*Cost per seconds*/
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Base Attribute")
-	float SprintCostStamina = 5.0f;
+	float SprintCostStamina;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Base Attribute/Player Only")
-	float AimFOV = 50.0f;
+	float AimFOV;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Base Attribute/Player Only")
-	float NormalFOV = 90.0f;
+	float NormalFOV;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Base Attribute/Player Only")
-	float AimSpeed = 3.0f;
+	float AimSpeed;
+	
+	FCharacterBaseAttribute(): MaxHealth(100.0f), MaxStamina(100.0f), StaminaRefillSpeed(5.0f), WalkSpeed(500.0f), SprintSpeed(900.0f), 
+		SprintCostStamina(15.0f), AimFOV(50.0f), NormalFOV(90.0f), AimSpeed(3.0f)  
+	{
+	}
 };
 
 class UWeaponComponent;
@@ -64,17 +69,29 @@ class ATechnicalExerciseCharacter : public ACharacter, public IDamageable
 public:
 	ATechnicalExerciseCharacter();
 
+	UFUNCTION()
+	virtual void OnBulletHitBind(AActor* hitActor);
 	// Damageble Interface
 	float GetHealth_Implementation() const override;
 	float GetMaxHealth_Implementation() const override;
+	void RefillHealth_Implementation() override;
 	void ApplyDamage_Implementation(const float DamageValue) override;
 
-	virtual void OnCharacterDead();
+	/*Reference Getter*/
+	const FCharacterBaseAttribute& GetCharacterAttribute() const;
+	UWeaponComponent* GetWeaponComponent() const;
+
+	/*On Character Dead/Revive*/
+	virtual void OnCharacterDeath();
+	virtual void OnCharacterRevive();
 	/*A Normalized vector for trace direction*/
-	virtual FVector GetWeaponTraceDirection() const;
+	virtual FVector GetWeaponTraceStartLocation() const;
+	virtual FVector GetWeaponTraceEndDirection() const;
+
+	void StartRagdoll();
+	void StopRagdoll();
 
 protected:
-	// To add mapping context
 	virtual void BeginPlay();
 
 protected:
@@ -89,5 +106,8 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	TObjectPtr<UWeaponComponent> WeaponComponent;
+
+private:
+	FTransform DefaultsMeshTransform;
 };
 

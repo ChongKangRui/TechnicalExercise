@@ -8,6 +8,7 @@
 
 class ATE_PlayerController;
 class UW_PlayerCrosshair;
+class ATechnicalExerciseGameMode;
 
 UCLASS()
 class TECHNICALEXERCISE_API APlayerCharacter : public ATechnicalExerciseCharacter
@@ -23,6 +24,7 @@ public:
 	FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
 
 	void BeginPlay() override;
+	void OnCharacterRevive() override;
 protected:
 	/*Move Control*/
 	void Move(const FInputActionValue& Value);
@@ -40,11 +42,20 @@ protected:
 	void AimTick();
 
 	/*Shoot*/
-	void Shoot();
+	void StartShoot();
+	void StopShoot();
 
 	/*Start/Stop Stamina Regen*/
 	void StartStaminaRegen();
 	void StopStaminaRegen();
+
+	/*Reload or respawn input*/
+	void ReloadOrRespawn();
+	void StopRespawn();
+
+	/*Open/Close Scoreboard*/
+	void OpenScoreboard();
+	void CloseScoreboard();
 
 	/*Helper function to stop any timer*/
 	void StopTimer(FTimerHandle&  Handle);
@@ -54,7 +65,10 @@ protected:
 	float GetMaxStamina_Implementation() const override;
 
 	/*Player weapon trace direction is different with normal character, it take from camera instead*/
-	FVector GetWeaponTraceDirection() const override;
+	FVector GetWeaponTraceStartLocation() const override;
+	FVector GetWeaponTraceEndDirection() const override;
+
+	void OnCharacterDeath() override;
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
@@ -67,18 +81,24 @@ protected:
 	float Stamina = 100.0f;
 
 private:
+	void OnBulletHitBind(AActor* actor) override;
 	void InitializeWidget();
 
 private:
 	FTimerHandle m_SprintStaminaCostTimer;
 	FTimerHandle m_StaminaRegenTimer;
 	FTimerHandle m_AimTimer;
+	FTimerHandle m_RespawnTimer;
 
 	TSubclassOf<UUserWidget> m_CrosshairWidgetClass;
+	TSubclassOf<UUserWidget> m_ScoreboardWidgetClass;
 	TWeakObjectPtr<UW_PlayerCrosshair> m_PlayerCrosshair;
+	TWeakObjectPtr<UUserWidget> m_Scoreboard;
+
+	TObjectPtr<ATechnicalExerciseGameMode> m_GameMode;
 
 	bool m_IsAiming = false;
-
+	bool m_DisableControl = false;
 	/*Use friend for player controller, so it can access all the control functionality to the player character*/
 	friend ATE_PlayerController;
 };

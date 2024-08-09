@@ -2,7 +2,13 @@
 
 
 #include "PickupBase_Ammunition.h"
+#include "Character/WeaponComponent.h"
 
-
-
-
+void APickupBase_Ammunition::OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+	if (OtherActor)
+		if (auto wp = OtherActor->GetComponentByClass<UWeaponComponent>()) {
+			wp->RefillAllAmmunition();
+			Destroy();
+		}
+}

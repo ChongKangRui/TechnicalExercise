@@ -11,8 +11,10 @@ void UW_HelthBar::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 
 	if (Owner)
 	{
-		UpdateHealthBar(Owner);
-		UpdateStaminaBar(Owner);
+		if (Owner->GetClass()->ImplementsInterface(UDamageable::StaticClass())) {
+			UpdateHealthBar(Owner);
+			UpdateStaminaBar(Owner);
+		}
 	}
 }
 

@@ -4,8 +4,10 @@
 #include "WeaponBase.h"
 #include "DamageSystem/Damageable.h"
 #include "NiagaraFunctionLibrary.h"
+#include "NiagaraDataInterfaceArrayFunctionLibrary.h"
 #include "NiagaraComponent.h"
 #include "UI/W_PlayerCrosshair.h"
+#include "GameFramework/PlayerState.h"
 #include "Character/TechnicalExerciseCharacter.h"
 
 /*Helper function for bullet spread and exponent*/
@@ -50,14 +52,23 @@ void UWeaponComponent::BeginPlay()
 	if (GetOwner())
 		m_Owner = Cast<ATechnicalExerciseCharacter>(GetOwner());
 
+	m_WeaponBlueprint.Reset();
 	InitWeaponList();
-	SetWeapon(DefaultsWeapon);
+	if (!RandomWeapon) {
+		SetWeapon(DefaultsWeapon);
+	}
+	else {
+		int weaponToEquip = FMath::RandRange(0, DefaultsWeaponList.Num() - 1);
+		SetWeapon(DefaultsWeaponList[weaponToEquip]);
+	}
 }
 
 void UWeaponComponent::InitWeaponList()
 {
 	for (EWeaponType type : DefaultsWeaponList) {
-		m_WeaponList.Add(FStoredWeapon(type, GetWeaponAttributeRow(type)));
+		FStoredWeapon Weapon(FStoredWeapon(type, GetWeaponAttributeRow(type)));
+
+		m_WeaponList.Add(Weapon);
 	}
 }
 
@@ -72,8 +83,11 @@ void UWeaponComponent::SetWeapon(const EWeaponType Type)
 {
 	if (m_Owner.IsValid()) {
 
-		const FStoredWeapon& WeaponData = GetWeapon(Type);
-		if (!WeaponData.Attribute.WeaponClass) {
+		if (m_CurrentWeapon == Type)
+			return;
+
+		const FStoredWeapon& weaponData = GetWeapon(Type);
+		if (!weaponData.Attribute.WeaponClass) {
 			UE_LOG(LogTemp, Error, TEXT("Invalid Weapon Base Class"));
 			return;
 		}
@@ -81,103 +95,180 @@ void UWeaponComponent::SetWeapon(const EWeaponType Type)
 		if (m_WeaponBlueprint.IsValid())
 			GetWorld()->DestroyActor(m_WeaponBlueprint.Get());
 
-		if(UAnimMontage* m = WeaponData.Attribute.SwitchWeaponMontage)
+		if (UAnimMontage* m = weaponData.Attribute.SwitchWeaponMontage)
 			m_Owner->PlayAnimMontage(m);
 
 		//Set Spawn Collision Handling Override
 		FActorSpawnParameters ActorSpawnParams;
 		ActorSpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
 		ActorSpawnParams.Owner = m_Owner.Get();
-		m_WeaponBlueprint = GetWorld()->SpawnActor<AWeaponBase>(WeaponData.Attribute.WeaponClass, ActorSpawnParams);
+		m_WeaponBlueprint = GetWorld()->SpawnActor<AWeaponBase>(weaponData.Attribute.WeaponClass, ActorSpawnParams);
 
 		m_WeaponBlueprint->AttachToComponent(m_Owner->GetMesh(),
-			FAttachmentTransformRules::SnapToTargetNotIncludingScale, 
-			WeaponData.Attribute.AttachName);
+			FAttachmentTransformRules::SnapToTargetNotIncludingScale,
+			weaponData.Attribute.AttachName);
+
+		m_CanShoot = true;
 
 		m_CurrentWeapon = Type;
 	}
+
 }
 
 void UWeaponComponent::StartReload()
 {
 	const FStoredWeapon& storedWeapon = GetWeapon(m_CurrentWeapon);
-	if (storedWeapon.CanReload()) {
-		//GetWeapon(m_CurrentWeapon).Reload();
+	if (storedWeapon.CanReload() && !m_Owner->GetMesh()->GetAnimInstance()->Montage_IsPlaying(storedWeapon.Attribute.ReloadMontage)) {
 		//Play Montage instead
-
+		m_CanShoot = false;
+		if (UAnimMontage* reloadMontage = GetWeapon(m_CurrentWeapon).Attribute.ReloadMontage)
+			m_Owner->PlayAnimMontage(reloadMontage);
 
 	}
 }
 
 void UWeaponComponent::StartShooting()
 {
-	if (!m_Owner.IsValid())
+	if (!m_Owner.IsValid()) {
+		UE_LOG(LogTemp, Error, TEXT("WeaponComponent: Invalid Owner"));
 		return;
+	}
 
-	if (!m_WeaponBlueprint.IsValid())
+	if (!m_WeaponBlueprint.IsValid()) {
+		UE_LOG(LogTemp, Error, TEXT("WeaponComponent: Invalid Weapon Reference"));
 		return;
+	}
 
-	const FStoredWeapon& data = GetWeapon(m_CurrentWeapon);
+	if (!m_CanShoot) {
+		UE_LOG(LogTemp, Error, TEXT("WeaponComponent: Shoot Disable"));
+		return;
+	}
 
-	const FVector TraceStart = m_WeaponBlueprint->GetTraceStart();
-	const FVector TraceDirection = m_Owner->GetWeaponTraceDirection() * data.Attribute.TraceDistance;
+	FStoredWeapon& data = GetWeapon_Private(m_CurrentWeapon);
+
+	if (data.CurrentAmmunition <= 0) {
+		m_CanShoot = false;
+		StartReload();
+		return;
+	}
+
+	const FVector traceStart = m_Owner->GetWeaponTraceStartLocation();
+	const FVector traceDirection = m_Owner->GetWeaponTraceEndDirection();
+
+	if (UAnimMontage* ShootMontage = data.Attribute.ShootMontage)
+		m_Owner->PlayAnimMontage(ShootMontage);
 
 	for (int i = 0; i < data.Attribute.BulletPerShoot; i++) {
 
-		const float ActualSpreadAngle = data.Attribute.BulletBaseSpreadAngle;
-		const float HalfSpreadAngleInRadians = FMath::DegreesToRadians(ActualSpreadAngle * 0.5f);
+		const float actualSpreadAngle = data.Attribute.BulletBaseSpreadAngle;
+		const float halfSpreadAngleInRadians = FMath::DegreesToRadians(actualSpreadAngle * 0.5f);
 
-		const FVector FinalTraceDirection = VRandConeNormalDistribution(TraceDirection, HalfSpreadAngleInRadians, data.Attribute.Exponent);
+		const FVector finalTraceDirection = m_Owner->GetWeaponTraceStartLocation() + VRandConeNormalDistribution(traceDirection, halfSpreadAngleInRadians, data.Attribute.Exponent) * data.Attribute.TraceDistance;
 
 		TArray<FHitResult> results;
-		FHitResult Hit = WeaponTrace(TraceStart, FinalTraceDirection, results, 0.0f);
+		FHitResult hit = WeaponTrace(traceStart, finalTraceDirection, results);
 
 		/*Apply damage*/
-		if (!Hit.GetActor()) {
-			PlayShootEffect(FinalTraceDirection);
+		if (!hit.GetActor()) {
+			PlayShootEffect(data.Attribute, m_WeaponBlueprint->GetTraceStart(), finalTraceDirection);
 			continue;
 		}
-		else {
-			PlayShootEffect(Hit.Location);
-			PlayHitEffect(Hit.Location);
-		}
 
-		if (Hit.BoneName == "head")
-			IDamageable::Execute_ApplyDamage(Hit.GetActor(), data.Attribute.Damage * 2);
-		else
-			IDamageable::Execute_ApplyDamage(Hit.GetActor(), data.Attribute.Damage);
+		PlayShootEffect(data.Attribute, m_WeaponBlueprint->GetTraceStart(), hit.Location);
+		if (hit.GetActor()->ActorHasTag("Damageable")) {
+			if (!hit.GetActor()->GetClass()->ImplementsInterface(UDamageable::StaticClass()))
+				continue;
+
+			if (IDamageable::Execute_GetHealth(hit.GetActor()) <= 0)
+				continue;
+
+			float FinalDamage = 0;
+			if (hit.BoneName == "head")
+				FinalDamage = data.Attribute.Damage * 2;
+			else
+				FinalDamage = data.Attribute.Damage;
+
+			IDamageable::Execute_ApplyDamage(hit.GetActor(), FinalDamage);
+
+			PlayHitEffect(data.Attribute, hit.Location, FinalDamage);
+			OnBulletHit.Broadcast(hit.GetActor());
+		}
+	}
+
+	data.CurrentAmmunition -= 1;
+
+	/*If not hold to shoot or Is a bot, then reset the m_CanShoot after X Rate*/
+	/*Otherwise, for player, it will using StartShooting_Loop, the function below won't trigger*/
+	if (!data.Attribute.HoldToShoot || m_Owner->GetPlayerState()->IsABot()) {
+		m_CanShoot = false;
+
+		FTimerHandle tempTimeHandle;
+		FTimerDelegate tempDelegate;
+
+		tempDelegate.BindWeakLambda(this, [&]()
+			{
+				m_CanShoot = true;
+			});
+		GetWorld()->GetTimerManager().SetTimer(tempTimeHandle, tempDelegate, 0.01f, false, data.Attribute.Rate);
 	}
 }
 
-FHitResult UWeaponComponent::WeaponTrace(const FVector& StartTrace, const FVector& EndTrace, TArray<FHitResult>& OutHitResult, float SweepRadius) const
+void UWeaponComponent::StartShooting_Loop()
 {
-	TArray<FHitResult> HitResults;
-	FCollisionQueryParams TraceParams(SCENE_QUERY_STAT(WeaponTrace), /*bTraceComplex=*/ true, /*IgnoreActor=*/ m_Owner.Get());
+	const FStoredWeapon& data = GetWeapon(m_CurrentWeapon);
 
-	/*ECC_GameTraceChannel2 is weapon trace. Can check DefaultEngine.ini for more detail*/
-	const ECollisionChannel TraceChannel = ECC_GameTraceChannel2;
+	if (data.Attribute.HoldToShoot) {
+		FTimerDelegate tempDelegate;
+		tempDelegate.BindWeakLambda(this, [&]()
+			{
+				StartShooting();
+				UE_LOG(LogTemp, Error, TEXT("Shooting"));
+			});
+		GetWorld()->GetTimerManager().SetTimer(m_ShootTimer, tempDelegate, data.Attribute.Rate, true);
+	}
+	else {
+		StartShooting();
+	}
+}
 
-	if (SweepRadius > 0.0f)
-	{
-		GetWorld()->SweepMultiByChannel(HitResults, StartTrace, EndTrace, FQuat::Identity, TraceChannel, FCollisionShape::MakeSphere(SweepRadius), TraceParams);
+void UWeaponComponent::StopShooting_Loop()
+{
+	if (GetWorld()->GetTimerManager().IsTimerActive(m_ShootTimer)) {
+		GetWorld()->GetTimerManager().ClearTimer(m_ShootTimer);
+		m_ShootTimer.Invalidate();
 	}
-	else
-	{
-		GetWorld()->LineTraceMultiByChannel(HitResults, StartTrace, EndTrace, TraceChannel, TraceParams);
-	}
+}
+
+bool UWeaponComponent::IsShooting() const
+{
+	return GetWorld()->GetTimerManager().IsTimerActive(m_ShootTimer);
+}
+
+bool UWeaponComponent::CanShoot() const
+{
+	return m_CanShoot;
+}
+
+FHitResult UWeaponComponent::WeaponTrace(const FVector& StartTrace, const FVector& EndTrace, TArray<FHitResult>& OutHitResult) const
+{
+	TArray<FHitResult> hitResults;
+	FCollisionQueryParams traceParams(SCENE_QUERY_STAT(WeaponTrace), true, m_Owner.Get());
+
+	/*ECC_GameTraceChannel1 is bullet trace. Can check DefaultEngine.ini for more detail*/
+	const ECollisionChannel traceChannel = ECC_GameTraceChannel1;
+
+	GetWorld()->LineTraceMultiByChannel(hitResults, StartTrace, EndTrace, traceChannel, traceParams);
 
 	if (DebugTime > 0.0f) {
 
 		DrawDebugLine(GetWorld(), StartTrace, EndTrace, FColor::Red, false, DebugTime, 0, LineThickness);
 
 	}
-	FHitResult Hit(ForceInit);
-	if (HitResults.Num() > 0)
+	FHitResult hit(ForceInit);
+	if (hitResults.Num() > 0)
 	{
 		// Filter the output list to prevent multiple hits on the same actor;
-		// this is to prevent a single bullet dealing damage multiple times to
-		// a single actor if using an overlap trace
-		for (FHitResult& CurHitResult : HitResults)
+		for (FHitResult& CurHitResult : hitResults)
 		{
 			auto Pred = [&CurHitResult](const FHitResult& Other)
 				{
@@ -192,30 +283,51 @@ FHitResult UWeaponComponent::WeaponTrace(const FVector& StartTrace, const FVecto
 			}
 		}
 
-		Hit = OutHitResult.Last();
+		hit = OutHitResult.Last();
 	}
 	else
 	{
-		Hit.TraceStart = StartTrace;
-		Hit.TraceEnd = EndTrace;
+		hit.TraceStart = StartTrace;
+		hit.TraceEnd = EndTrace;
 	}
 
-	return Hit;
+	return hit;
 }
 
-void UWeaponComponent::PlayShootEffect(FVector ShootEndLocation)
+void UWeaponComponent::PlayShootEffect(const FWeaponAttribute& WeaponAttribute, const FVector& EffectStartLocation, const FVector& ShootEndLocation)
 {
+	if (auto tracerSystem = WeaponAttribute.Tracer) {
+		UNiagaraComponent* tracer = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+			this, tracerSystem, EffectStartLocation, FRotator::ZeroRotator);
+
+		TArray<FVector> ImpactLocation = { ShootEndLocation };
+		UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayVector(tracer, "User.ImpactPositions", ImpactLocation);
+	}
+
+	if (auto muzzle = WeaponAttribute.Muzzle) {
+		UNiagaraComponent* tracer = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+			this, muzzle, EffectStartLocation, FRotator::ZeroRotator);
+
+
+	}
 }
 
-void UWeaponComponent::PlayHitEffect(FVector ShootEndLocation)
+void UWeaponComponent::PlayHitEffect(const FWeaponAttribute& WeaponAttribute, const FVector& ShootEndLocation, const float Damage)
 {
-}
+	if (auto damageNumber = WeaponAttribute.DamageNumber) {
+		UNiagaraComponent* tracer = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+			this, damageNumber, ShootEndLocation, FRotator::ZeroRotator);
 
+		TArray<FVector4> DamageInfo = { FVector4(ShootEndLocation, Damage) };
+		UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayVector4(tracer, "User.DamageInfo", DamageInfo);
+	}
+}
 
 void UWeaponComponent::ReloadCurrentWeapon()
 {
 	FStoredWeapon& storedWeapon = GetWeapon_Private(m_CurrentWeapon);
 	storedWeapon.Reload();
+	m_CanShoot = true;
 }
 
 void UWeaponComponent::RefillAllAmmunition()
@@ -242,14 +354,14 @@ EWeaponType UWeaponComponent::GetCurrentWeaponType() const
 
 int UWeaponComponent::GetWeaponAmmunition(const EWeaponType Type) const
 {
-	const int Out = GetWeapon(Type).CurrentAmmunition;
-	return Out;
+	const int out = GetWeapon(Type).CurrentAmmunition;
+	return out;
 }
 
 int UWeaponComponent::GetMaxWepaonAmmunition(const EWeaponType Type) const
 {
-	const int Out = GetWeapon(Type).CurrentMaxAmmunition;
-	return Out;
+	const int out = GetWeapon(Type).CurrentMaxAmmunition;
+	return out;
 }
 
 const FWeaponAttribute& UWeaponComponent::GetWeaponAttributeRow(const TEnumAsByte<EWeaponType> Type) const
@@ -277,25 +389,29 @@ const FWeaponAttribute& UWeaponComponent::GetWeaponAttributeRow(const TEnumAsByt
 
 const FStoredWeapon& UWeaponComponent::GetWeapon(const EWeaponType Type) const
 {
-	static const FStoredWeapon DefaultWeapon;
+	static const FStoredWeapon defaultWeapon;
 
-	// Find weapon in the list by type
-	const FStoredWeapon* Weapon = m_WeaponList.FindByPredicate([&](const FStoredWeapon& Weapon) {
-		return Weapon.Type == Type;
+	const FStoredWeapon* weapon = m_WeaponList.FindByPredicate([&](const FStoredWeapon& WeaponAttribute) {
+		return Type == WeaponAttribute.Type;
 		});
 
-	// Return the found weapon or the default weapon
-	return Weapon ? *Weapon : DefaultWeapon;
+	return weapon ? *weapon : defaultWeapon;
+}
+
+AWeaponBase* UWeaponComponent::GetWeaponBlueprint() const
+{
+	return m_WeaponBlueprint.Get();
 }
 
 FStoredWeapon& UWeaponComponent::GetWeapon_Private(const EWeaponType Type)
 {
 	static FStoredWeapon defaultWeapon;
-	FStoredWeapon* Weapon = m_WeaponList.FindByPredicate([&](const FStoredWeapon& weapon) {
-		return Type == weapon.Type;
+
+	FStoredWeapon* weapon = m_WeaponList.FindByPredicate([&](const FStoredWeapon& WeaponAttribute) {
+		return Type == WeaponAttribute.Type;
 		});
 
-	return Weapon ? *Weapon : defaultWeapon;
+	return weapon ? *weapon : defaultWeapon;;
 }
 
 

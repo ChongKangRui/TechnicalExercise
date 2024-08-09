@@ -14,6 +14,6 @@ public class TechnicalExercise : ModuleRules
           }
       );
 
-        PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "MotionTrajectory", "UMG", "Niagara" });
+        PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "MotionTrajectory", "UMG", "Niagara", "Slate", "SlateCore" });
 	}
 }

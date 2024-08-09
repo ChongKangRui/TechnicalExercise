@@ -6,6 +6,8 @@
 #include "GameFramework/Actor.h"
 #include "PickupBase.generated.h"
 
+class USphereComponent;
+
 UCLASS()
 class TECHNICALEXERCISE_API APickupBase : public AActor
 {
@@ -23,6 +25,20 @@ public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
+
+	UPROPERTY(VisibleAnywhere, Category = "Components")
+		TObjectPtr<USphereComponent> SphereCollisionComponent;
+
+	// Function to handle the overlap event
+	UFUNCTION()
+	virtual void OnOverlapBegin(
+		UPrimitiveComponent* OverlappedComp,
+		AActor* OtherActor,
+		UPrimitiveComponent* OtherComp,
+		int32 OtherBodyIndex,
+		bool bFromSweep,
+		const FHitResult& SweepResult
+	);
 	
 	
 };

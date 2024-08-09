@@ -61,7 +61,9 @@ void ATE_PlayerController::SetupInputComponent()
         }
 
         if (const UInputAction* Shoot = PlayerMappingDataset->ShootAction.Get()) {
-          //  EnhancedInputComponent->BindAction(Shoot, ETriggerEvent::Started, m_Character.Get(), &APlayerCharacter::meleeAttack);
+            EnhancedInputComponent->BindAction(Shoot, ETriggerEvent::Started, m_Character.Get(), &APlayerCharacter::StartShoot);
+            EnhancedInputComponent->BindAction(Shoot, ETriggerEvent::Canceled, m_Character.Get(), &APlayerCharacter::StopShoot);
+            EnhancedInputComponent->BindAction(Shoot, ETriggerEvent::Completed, m_Character.Get(), &APlayerCharacter::StopShoot);
         }
 
         if (const UInputAction* Aim = PlayerMappingDataset->AimAction.Get()) {
@@ -71,7 +73,9 @@ void ATE_PlayerController::SetupInputComponent()
         }
 
         if (const UInputAction* Reload = PlayerMappingDataset->ReloadAction.Get()) {
-            EnhancedInputComponent->BindAction(Reload, ETriggerEvent::Started, m_Character->WeaponComponent.Get(), &UWeaponComponent::ReloadCurrentWeapon);
+            EnhancedInputComponent->BindAction(Reload, ETriggerEvent::Started, m_Character.Get(), &APlayerCharacter::ReloadOrRespawn);
+            EnhancedInputComponent->BindAction(Reload, ETriggerEvent::Canceled, m_Character.Get(), &APlayerCharacter::EndAim);
+            EnhancedInputComponent->BindAction(Reload, ETriggerEvent::Completed, m_Character.Get(), &APlayerCharacter::EndAim);
         }
 
         if (const UInputAction* SelectPistol= PlayerMappingDataset->PistolSelectionAction.Get()) {
@@ -86,8 +90,12 @@ void ATE_PlayerController::SetupInputComponent()
             EnhancedInputComponent->BindAction(SelectShotgun, ETriggerEvent::Started, m_Character->WeaponComponent.Get(), &UWeaponComponent::SetWeapon, EWeaponType::ShotGun);
         }
 
+        if (const UInputAction* ScoreboardTrigger = PlayerMappingDataset->ScoreboardTriggerAction.Get()) {
+            EnhancedInputComponent->BindAction(ScoreboardTrigger, ETriggerEvent::Started, m_Character.Get(), &APlayerCharacter::OpenScoreboard);
+            EnhancedInputComponent->BindAction(ScoreboardTrigger, ETriggerEvent::Canceled, m_Character.Get(), &APlayerCharacter::CloseScoreboard);
+            EnhancedInputComponent->BindAction(ScoreboardTrigger, ETriggerEvent::Completed, m_Character.Get(), &APlayerCharacter::CloseScoreboard);
 
-
+        }
 
         UE_LOG(LogTemp, Error, TEXT("PC: Bind input action success"));
     }
