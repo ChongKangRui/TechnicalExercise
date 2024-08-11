@@ -1,13 +1,13 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Player/TE_PlayerController.h"
-#include "EnhancedInputSubsystems.h"
-#include "EnhancedInputComponent.h"
+#include "TE_PlayerController.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Character/WeaponComponent.h"
 #include "PlayerCharacter.h"
+#include "EnhancedInputSubsystems.h"
+#include "EnhancedInputComponent.h"
 #include "PlayerInputMapping.h"
 #include "InputMappingContext.h"
 #include "InputAction.h"
@@ -18,8 +18,11 @@ void ATE_PlayerController::OnPossess(APawn* pawn)
 
     if (pawn) {
         m_Character = Cast<APlayerCharacter>(pawn);
-        loadPlayerMappingDataset();
+        LoadPlayerMappingDataset();
+        /*Making sure input component was setup properly*/
         SetupInputComponent();
+        SetInputMode(FInputModeGameOnly());
+        bShowMouseCursor = false;
     }
 }
 
@@ -37,63 +40,61 @@ void ATE_PlayerController::SetupInputComponent()
         return;
     }
     //Binding Input Action
-    if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(InputComponent))
+    if (UEnhancedInputComponent* enhancedInputComponent = Cast<UEnhancedInputComponent>(InputComponent))
     {
-        if (const UInputAction* Move = PlayerMappingDataset->MoveAction.Get()) {
-            EnhancedInputComponent->BindAction(Move, ETriggerEvent::Triggered, m_Character.Get(), &APlayerCharacter::Move);
+        if (const UInputAction* move = PlayerMappingDataset->MoveAction.Get()) {
+            enhancedInputComponent->BindAction(move, ETriggerEvent::Triggered, m_Character.Get(), &APlayerCharacter::Move);
         }
 
-        if (const UInputAction* Look = PlayerMappingDataset->LookAction.Get()) {
-           EnhancedInputComponent->BindAction(Look, ETriggerEvent::Triggered, m_Character.Get(), &APlayerCharacter::Look);
+        if (const UInputAction* look = PlayerMappingDataset->LookAction.Get()) {
+            enhancedInputComponent->BindAction(look, ETriggerEvent::Triggered, m_Character.Get(), &APlayerCharacter::Look);
         }
 
-        if (const UInputAction* Sprint = PlayerMappingDataset->SprintAction.Get()) {
-            EnhancedInputComponent->BindAction(Sprint, ETriggerEvent::Started, m_Character.Get(), &APlayerCharacter::StartSprint);
-            EnhancedInputComponent->BindAction(Sprint, ETriggerEvent::Canceled, m_Character.Get(), &APlayerCharacter::StopSprint);
-            EnhancedInputComponent->BindAction(Sprint, ETriggerEvent::Completed, m_Character.Get(), &APlayerCharacter::StopSprint);
+        if (const UInputAction* sprint = PlayerMappingDataset->SprintAction.Get()) {
+            enhancedInputComponent->BindAction(sprint, ETriggerEvent::Started, m_Character.Get(), &APlayerCharacter::StartSprint);
+            enhancedInputComponent->BindAction(sprint, ETriggerEvent::Canceled, m_Character.Get(), &APlayerCharacter::StopSprint);
+            enhancedInputComponent->BindAction(sprint, ETriggerEvent::Completed, m_Character.Get(), &APlayerCharacter::StopSprint);
         }
 
 
-        if (const UInputAction* Jump = PlayerMappingDataset->JumpAction.Get()) {
-            EnhancedInputComponent->BindAction(Jump, ETriggerEvent::Started, m_Character.Get(), &APlayerCharacter::Jump);
-            EnhancedInputComponent->BindAction(Jump, ETriggerEvent::Canceled, m_Character.Get(), &APlayerCharacter::StopJumping);
-            EnhancedInputComponent->BindAction(Jump, ETriggerEvent::Completed, m_Character.Get(), &APlayerCharacter::StopJumping);
+        if (const UInputAction* jump = PlayerMappingDataset->JumpAction.Get()) {
+            enhancedInputComponent->BindAction(jump, ETriggerEvent::Started, m_Character.Get(), &APlayerCharacter::CharacterJump);
+            enhancedInputComponent->BindAction(jump, ETriggerEvent::Canceled, m_Character.Get(), &APlayerCharacter::StopJumping);
+            enhancedInputComponent->BindAction(jump, ETriggerEvent::Completed, m_Character.Get(), &APlayerCharacter::StopJumping);
         }
 
-        if (const UInputAction* Shoot = PlayerMappingDataset->ShootAction.Get()) {
-            EnhancedInputComponent->BindAction(Shoot, ETriggerEvent::Started, m_Character.Get(), &APlayerCharacter::StartShoot);
-            EnhancedInputComponent->BindAction(Shoot, ETriggerEvent::Canceled, m_Character.Get(), &APlayerCharacter::StopShoot);
-            EnhancedInputComponent->BindAction(Shoot, ETriggerEvent::Completed, m_Character.Get(), &APlayerCharacter::StopShoot);
+        if (const UInputAction* shoot = PlayerMappingDataset->ShootAction.Get()) {
+            enhancedInputComponent->BindAction(shoot, ETriggerEvent::Started, m_Character.Get(), &APlayerCharacter::StartShoot);
+            enhancedInputComponent->BindAction(shoot, ETriggerEvent::Canceled, m_Character.Get(), &APlayerCharacter::StopShoot);
+            enhancedInputComponent->BindAction(shoot, ETriggerEvent::Completed, m_Character.Get(), &APlayerCharacter::StopShoot);
         }
 
-        if (const UInputAction* Aim = PlayerMappingDataset->AimAction.Get()) {
-            EnhancedInputComponent->BindAction(Aim, ETriggerEvent::Started, m_Character.Get(), &APlayerCharacter::BeginAim);
-            EnhancedInputComponent->BindAction(Aim, ETriggerEvent::Canceled, m_Character.Get(), &APlayerCharacter::EndAim);
-            EnhancedInputComponent->BindAction(Aim, ETriggerEvent::Completed, m_Character.Get(), &APlayerCharacter::EndAim);
+        if (const UInputAction* aim = PlayerMappingDataset->AimAction.Get()) {
+            enhancedInputComponent->BindAction(aim, ETriggerEvent::Started, m_Character.Get(), &APlayerCharacter::BeginAim);
+            enhancedInputComponent->BindAction(aim, ETriggerEvent::Canceled, m_Character.Get(), &APlayerCharacter::EndAim);
+            enhancedInputComponent->BindAction(aim, ETriggerEvent::Completed, m_Character.Get(), &APlayerCharacter::EndAim);
         }
 
-        if (const UInputAction* Reload = PlayerMappingDataset->ReloadAction.Get()) {
-            EnhancedInputComponent->BindAction(Reload, ETriggerEvent::Started, m_Character.Get(), &APlayerCharacter::ReloadOrRespawn);
-            EnhancedInputComponent->BindAction(Reload, ETriggerEvent::Canceled, m_Character.Get(), &APlayerCharacter::EndAim);
-            EnhancedInputComponent->BindAction(Reload, ETriggerEvent::Completed, m_Character.Get(), &APlayerCharacter::EndAim);
+        if (const UInputAction* reload = PlayerMappingDataset->ReloadAction.Get()) {
+            enhancedInputComponent->BindAction(reload, ETriggerEvent::Started, m_Character.Get(), &APlayerCharacter::ReloadOrRespawn);
         }
 
-        if (const UInputAction* SelectPistol= PlayerMappingDataset->PistolSelectionAction.Get()) {
-            EnhancedInputComponent->BindAction(SelectPistol, ETriggerEvent::Started, m_Character->WeaponComponent.Get(), &UWeaponComponent::SetWeapon, EWeaponType::Pistol);
+        if (const UInputAction* selectPistol= PlayerMappingDataset->PistolSelectionAction.Get()) {
+            enhancedInputComponent->BindAction(selectPistol, ETriggerEvent::Started, m_Character->WeaponComponent.Get(), &UWeaponComponent::SetWeapon, EWeaponType::Pistol);
         }
 
-        if (const UInputAction* SelectSMG = PlayerMappingDataset->SMGSelectionAction.Get()) {
-            EnhancedInputComponent->BindAction(SelectSMG, ETriggerEvent::Started, m_Character->WeaponComponent.Get(), &UWeaponComponent::SetWeapon, EWeaponType::SMG);
+        if (const UInputAction* selectSMG = PlayerMappingDataset->SMGSelectionAction.Get()) {
+            enhancedInputComponent->BindAction(selectSMG, ETriggerEvent::Started, m_Character->WeaponComponent.Get(), &UWeaponComponent::SetWeapon, EWeaponType::SMG);
         }
 
-        if (const UInputAction* SelectShotgun= PlayerMappingDataset->ShotgunSelectionAction.Get()) {
-            EnhancedInputComponent->BindAction(SelectShotgun, ETriggerEvent::Started, m_Character->WeaponComponent.Get(), &UWeaponComponent::SetWeapon, EWeaponType::ShotGun);
+        if (const UInputAction* selectShotgun= PlayerMappingDataset->ShotgunSelectionAction.Get()) {
+            enhancedInputComponent->BindAction(selectShotgun, ETriggerEvent::Started, m_Character->WeaponComponent.Get(), &UWeaponComponent::SetWeapon, EWeaponType::ShotGun);
         }
 
-        if (const UInputAction* ScoreboardTrigger = PlayerMappingDataset->ScoreboardTriggerAction.Get()) {
-            EnhancedInputComponent->BindAction(ScoreboardTrigger, ETriggerEvent::Started, m_Character.Get(), &APlayerCharacter::OpenScoreboard);
-            EnhancedInputComponent->BindAction(ScoreboardTrigger, ETriggerEvent::Canceled, m_Character.Get(), &APlayerCharacter::CloseScoreboard);
-            EnhancedInputComponent->BindAction(ScoreboardTrigger, ETriggerEvent::Completed, m_Character.Get(), &APlayerCharacter::CloseScoreboard);
+        if (const UInputAction* scoreboardTrigger = PlayerMappingDataset->ScoreboardTriggerAction.Get()) {
+            enhancedInputComponent->BindAction(scoreboardTrigger, ETriggerEvent::Started, m_Character.Get(), &APlayerCharacter::OpenScoreboard);
+            enhancedInputComponent->BindAction(scoreboardTrigger, ETriggerEvent::Canceled, m_Character.Get(), &APlayerCharacter::CloseScoreboard);
+            enhancedInputComponent->BindAction(scoreboardTrigger, ETriggerEvent::Completed, m_Character.Get(), &APlayerCharacter::CloseScoreboard);
 
         }
 
@@ -104,7 +105,7 @@ void ATE_PlayerController::SetupInputComponent()
     PlayerMappingDataset.Reset();
 }
 
-void ATE_PlayerController::loadPlayerMappingDataset()
+void ATE_PlayerController::LoadPlayerMappingDataset()
 {
     //Load the player mapping context and input action from the data asset
     if (PlayerMappingDataset.IsPending()) {
@@ -112,9 +113,9 @@ void ATE_PlayerController::loadPlayerMappingDataset()
     }
 
     if (PlayerMappingDataset.IsValid()) {
-        if (const UInputMappingContext* MappingContext = PlayerMappingDataset->DefaultMappingContext.Get()) {
-            if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(this->GetLocalPlayer())) {
-                Subsystem->AddMappingContext(MappingContext, 0);
+        if (const UInputMappingContext* mappingContext = PlayerMappingDataset->DefaultMappingContext.Get()) {
+            if (UEnhancedInputLocalPlayerSubsystem* subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(this->GetLocalPlayer())) {
+                subsystem->AddMappingContext(mappingContext, 0);
             }
         }
     }

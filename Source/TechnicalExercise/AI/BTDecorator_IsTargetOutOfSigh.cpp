@@ -6,20 +6,29 @@
 #include "BehaviorTree/BlackboardComponent.h"
 #include "AIController.h"
 
+
+UBTDecorator_IsTargetOutOfSigh::UBTDecorator_IsTargetOutOfSigh()
+{
+    bCreateNodeInstance = true;
+    bAllowAbortChildNodes = true;
+
+}
+
 bool UBTDecorator_IsTargetOutOfSigh::CalculateRawConditionValue(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) const
 {
-    if (const UObject* Target = OwnerComp.GetBlackboardComponent()->GetValueAsObject(TargetKey.SelectedKeyName)) {
+    if (const UObject* target = OwnerComp.GetBlackboardComponent()->GetValueAsObject(TargetKey.SelectedKeyName)) {
 
-        if (const AActor* TargetActor = Cast<AActor>(Target)) {
+        if (const AActor* targetActor = Cast<AActor>(target)) {
 
             if (OwnerComp.GetAIOwner()) {
-               bool Result =  OwnerComp.GetAIOwner()->LineOfSightTo(TargetActor);
-
-               return Result == ShouldInSight;
+               bool result =  OwnerComp.GetAIOwner()->LineOfSightTo(targetActor, FVector(0), true);
+               //Switch and abort task based on the result
+               return result == ShouldInSight;
             }
         }
     }
-
-
-	return false;
+    return true;
 }
+
+
+

@@ -6,9 +6,9 @@
 
 void UAnimNotify_Reload::Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation)
 {
-	if (AActor* Owner = MeshComp->GetOwner()) {
-		if (UWeaponComponent* Wc = Owner->GetComponentByClass<UWeaponComponent>()) {
-			Wc->ReloadCurrentWeapon();
+	if (AActor* owner = MeshComp->GetOwner()) {
+		if (UWeaponComponent* wc = owner->GetComponentByClass<UWeaponComponent>()) {
+			wc->ReloadCurrentWeapon();
 		}
 	}
 }

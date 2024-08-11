@@ -9,14 +9,15 @@
 
 void UEnvQueryContext_Target::ProvideContext(FEnvQueryInstance& QueryInstance, FEnvQueryContextData& ContextData) const
 {
-    if (AAICharacterBase* QueryOwner = Cast<AAICharacterBase>(QueryInstance.Owner.Get())) {
-        if (AAIControllerBase* controller = Cast<AAIControllerBase>(QueryOwner->GetController())) {
+    /*QueryCenter need to be the target*/
+    if (AAICharacterBase*  queryOwner = Cast<AAICharacterBase>(QueryInstance.Owner.Get())) {
+        if (AAIControllerBase* controller = Cast<AAIControllerBase>(queryOwner->GetController())) {
 
             if (controller->GetCurrentTarget()) {
                 UEnvQueryItemType_Actor::SetContextHelper(ContextData, controller->GetCurrentTarget());
             }
             else {
-                UEnvQueryItemType_Actor::SetContextHelper(ContextData, QueryOwner);
+                UEnvQueryItemType_Actor::SetContextHelper(ContextData, queryOwner);
             }
         }
     }

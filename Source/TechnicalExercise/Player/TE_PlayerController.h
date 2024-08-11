@@ -23,10 +23,9 @@ protected:
 	TSoftObjectPtr<UPlayerInputMapping> PlayerMappingDataset;
 
 private:
-	void loadPlayerMappingDataset();
+	void LoadPlayerMappingDataset();
 
 private:
 	TObjectPtr<APlayerCharacter> m_Character;
-	
 	
 };

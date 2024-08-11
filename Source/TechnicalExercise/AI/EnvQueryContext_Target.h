@@ -6,9 +6,7 @@
 #include "EnvironmentQuery/EnvQueryContext.h"
 #include "EnvQueryContext_Target.generated.h"
 
-/**
- * 
- */
+
 UCLASS()
 class TECHNICALEXERCISE_API UEnvQueryContext_Target : public UEnvQueryContext
 {
@@ -16,6 +14,4 @@ class TECHNICALEXERCISE_API UEnvQueryContext_Target : public UEnvQueryContext
 	
 public:
 	virtual void ProvideContext(FEnvQueryInstance& QueryInstance, FEnvQueryContextData& ContextData) const;
-	
-	
 };

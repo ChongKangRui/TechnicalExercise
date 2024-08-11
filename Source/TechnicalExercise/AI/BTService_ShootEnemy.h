@@ -33,7 +33,11 @@ public:
 	float MaxPitchRandomOffset = 30;
 
 	UPROPERTY(EditInstanceOnly)
+	float PitchBaseOffset = -5.0f;
+
+	UPROPERTY(EditInstanceOnly)
 	bool DisableShooting = false;
+
 private:
 	TWeakObjectPtr<UWeaponComponent> m_WeaponComponent;
 	TWeakObjectPtr<AAIControllerBase> m_AiController;

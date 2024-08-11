@@ -6,15 +6,12 @@
 #include "GameFramework/PlayerState.h"
 #include "PlayerStateBase.generated.h"
 
-/**
- * 
- */
+
 UCLASS()
 class TECHNICALEXERCISE_API APlayerStateBase : public APlayerState
 {
 	GENERATED_BODY()
 	
-
 public:
 	void AddPoint();
 	void SetName(FString name);

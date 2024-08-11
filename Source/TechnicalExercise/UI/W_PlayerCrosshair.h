@@ -7,6 +7,7 @@
 #include "W_PlayerCrosshair.generated.h"
 
 class UWeaponComponent;
+class UTextBlock;
 
 UCLASS()
 class TECHNICALEXERCISE_API UW_PlayerCrosshair : public UUserWidget

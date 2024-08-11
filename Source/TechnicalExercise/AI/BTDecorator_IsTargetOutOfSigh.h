@@ -10,11 +10,13 @@
  * 
  */
 UCLASS()
-class TECHNICALEXERCISE_API UBTDecorator_IsTargetOutOfSigh : public UBTDecorator_Blackboard
+class TECHNICALEXERCISE_API UBTDecorator_IsTargetOutOfSigh : public UBTDecorator
 {
 	GENERATED_BODY()
 	
 public:
+	UBTDecorator_IsTargetOutOfSigh(); 
+
 	UPROPERTY(EditInstanceOnly)
 	FBlackboardKeySelector TargetKey;
 
@@ -23,6 +25,5 @@ public:
 
 private:
 	bool CalculateRawConditionValue(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) const override;
-	
-	
+
 };

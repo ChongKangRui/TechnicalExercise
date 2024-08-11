@@ -7,29 +7,21 @@
 #include "PickupBase.generated.h"
 
 class USphereComponent;
+class UWidgetComponent;
+class UW_StartTimer;
 
 UCLASS()
 class TECHNICALEXERCISE_API APickupBase : public AActor
 {
 	GENERATED_BODY()
-	
-public:	
-	// Sets default values for this actor's properties
-	APickupBase();
 
 protected:
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
+	APickupBase();
 
-public:	
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
-
-
-	UPROPERTY(VisibleAnywhere, Category = "Components")
-		TObjectPtr<USphereComponent> SphereCollisionComponent;
+	void BeginPlay() override;
 
 	// Function to handle the overlap event
+	// Bind it in base class but the functionality will be override in derive class
 	UFUNCTION()
 	virtual void OnOverlapBegin(
 		UPrimitiveComponent* OverlappedComp,
@@ -39,6 +31,23 @@ public:
 		bool bFromSweep,
 		const FHitResult& SweepResult
 	);
-	
-	
+
+	void StartPickupCoolDown();
+
+protected:
+	UPROPERTY(EditDefaultsOnly, Category = "Components")
+	TObjectPtr<USphereComponent> SphereCollisionComponent;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Components")
+	TObjectPtr<UWidgetComponent> WidgetComponent;
+
+	UPROPERTY(EditDefaultsOnly)
+	float WidgetHeight = 100.0f;
+
+	UPROPERTY(EditDefaultsOnly)
+	float PickupCD = 30.0f;
+
+	bool CanPickup;
+private:
+	TObjectPtr<UW_StartTimer> m_CoolDownTimer;
 };

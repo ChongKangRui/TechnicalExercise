@@ -7,8 +7,8 @@
 #include "Perception/AISenseConfig_Hearing.h"
 #include "BehaviorTree/BehaviorTreeComponent.h"
 #include "BehaviorTree/BlackboardComponent.h"
-#include "GameFramework/CharacterMovementComponent.h"
 #include "BehaviorTree/BehaviorTree.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "AICharacterBase.h"
 #include "DamageSystem/Damageable.h"
 #include "TechnicalExerciseGameMode.h"
@@ -23,6 +23,7 @@ AAIControllerBase::AAIControllerBase()
 	AIPerceptionComponent->ConfigureSense(*HearConfig);
 	AIPerceptionComponent->SetDominantSense(SightConfig->GetSenseImplementation());
 
+	/*Make sure AI Detect everyone since everyone is enemy*/
 	FAISenseAffiliationFilter detection;
 	detection.bDetectEnemies = true;
 	detection.bDetectFriendlies = true;
@@ -36,13 +37,13 @@ AAIControllerBase::AAIControllerBase()
 	HearConfig->HearingRange = 4000;
 	HearConfig->DetectionByAffiliation = detection;
 
-	bStopAILogicOnUnposses = false;
-
 	bWantsPlayerState = true;
 
+	/*Higher Tick Interval for optimization purpose*/
 	SetActorTickInterval(0.5f);
 	SetActorTickEnabled(false);
 
+	/*Get Behavior Tree*/
 	static ConstructorHelpers::FObjectFinder<UBehaviorTree> BTObject(TEXT("/Script/AIModule.BehaviorTree'/Game/Blueprint/AI/BehaviorTree/BT_AI.BT_AI'"));
 	if (BTObject.Succeeded())
 	{
@@ -61,9 +62,12 @@ void AAIControllerBase::onPerceptionUpdated(const TArray<AActor*>& updatedActors
 		return;
 
 	for (AActor* target : updatedActors) {
+		if (target == m_PossessedEnemy)
+			continue;
+
+		/*If target alive, set it as AI Target*/
 		if (IDamageable::Execute_GetHealth(target) > 0) {
 			SetTarget(target);
-			ToggleUseControlRotation(true);
 			SetActorTickEnabled(true);
 		}
 	}
@@ -73,25 +77,20 @@ void AAIControllerBase::OnPossess(APawn* PawnToProcess)
 {
 	Super::OnPossess(PawnToProcess);
 
+	/*Initialize Enemy Character reference*/
 	if (AAICharacterBase* enemy = Cast<AAICharacterBase>(PawnToProcess)) {
 		m_PossessedEnemy = enemy;
 	}
-	
+	/*Bind event to OnPErceptionUpdated*/
 	AIPerceptionComponent->OnPerceptionUpdated.AddDynamic(this, &AAIControllerBase::onPerceptionUpdated);
-
-	if(m_BT.IsValid())
-		RunBehaviorTree(m_BT.Get());
-
-	ClearTarget();
 }
 
 void AAIControllerBase::BeginPlay()
 {
 	Super::BeginPlay();
-
+	/*Initialize Game Mode Reference*/
 	if (!m_GameMode) {
 		if (ATechnicalExerciseGameMode* gm = GetWorld()->GetAuthGameMode<ATechnicalExerciseGameMode>()) {
-			gm->AssignNameToTarget(this);
 			m_GameMode = gm;
 		}
 	}
@@ -105,7 +104,6 @@ void AAIControllerBase::Tick(float DeltaTime)
 	if (m_Target.IsValid()) {
 		if (IDamageable::Execute_GetHealth(m_Target.Get()) <= 0) {
 			ClearTarget();
-			ToggleUseControlRotation(false);
 			SetActorTickEnabled(false);
 
 		}
@@ -114,10 +112,7 @@ void AAIControllerBase::Tick(float DeltaTime)
 
 void AAIControllerBase::OnCharacterDeath()
 {
-	SetActorTickEnabled(false);
-	ClearTarget();
-
-	BrainComponent->StopLogic("Death");
+	StopLogic();
 	Respawn();
 }
 
@@ -125,6 +120,22 @@ void AAIControllerBase::RestartLogic()
 {
 	ClearTarget();
 	BrainComponent->RestartLogic();
+}
+
+void AAIControllerBase::StopLogic()
+{
+	SetActorTickEnabled(false);
+	ClearTarget();
+
+	BrainComponent->StopLogic("Death/EndGame");
+}
+
+void AAIControllerBase::StartBehaviorTree()
+{
+	if (m_BT.IsValid())
+		RunBehaviorTree(m_BT.Get());
+
+	ClearTarget();
 }
 
 void AAIControllerBase::ToggleUseControlRotation(bool bUseControlRotation)
@@ -140,17 +151,24 @@ void AAIControllerBase::SetTarget(AActor* Target)
 	if (!Target)
 		return;
 
+	m_Target.Reset();
+
 	m_Target = Target;
 	GetBlackboardComponent()->SetValueAsObject("Target", m_Target.Get());
+	ToggleUseControlRotation(true);
 
-	if(m_PossessedEnemy)
+	if (m_PossessedEnemy) {
 		m_PossessedEnemy->GetCharacterMovement()->MaxWalkSpeed = m_PossessedEnemy->GetCharacterAttribute().WalkSpeed;
+	}
 }
 
 void AAIControllerBase::ClearTarget()
 {
-	m_Target.Reset();
-	GetBlackboardComponent()->ClearValue("Target");
+	if (GetBlackboardComponent()) {
+		GetBlackboardComponent()->ClearValue("Target");
+		m_Target.Reset();
+		ToggleUseControlRotation(false);
+	}
 
 	if(m_PossessedEnemy)
 		m_PossessedEnemy->GetCharacterMovement()->MaxWalkSpeed = m_PossessedEnemy->GetCharacterAttribute().SprintSpeed;
@@ -167,7 +185,7 @@ void AAIControllerBase::Respawn()
 				m_GameMode->RespawnTarget(m_PossessedEnemy.Get());
 			}
 		});
-	GetWorld()->GetTimerManager().SetTimer(tempHandle, tempDelegate,0.5f, false, 5.0f);
+	GetWorld()->GetTimerManager().SetTimer(tempHandle, tempDelegate,1.0f, false, 5.0f);
 }
 
 const AActor* AAIControllerBase::GetCurrentTarget() const

@@ -14,7 +14,7 @@ class TECHNICALEXERCISE_API APickupBase_Health : public APickupBase
 {
 	GENERATED_BODY()
 	
-public:
+protected:
 	virtual void OnOverlapBegin(
 		UPrimitiveComponent* OverlappedComp,
 		AActor* OtherActor,

@@ -17,8 +17,8 @@ struct FInputActionValue;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
-
-/*Character base attribute, used for data collection*/
+/*Character base attribute, can used for data collection such as datatable*/
+/*But since both player and enemy shared the same attribute for now, this will be editable in player/enemy blueprint*/
 USTRUCT(Blueprintable)
 struct FCharacterBaseAttribute : public FTableRowBase {
 	GENERATED_BODY()
@@ -43,6 +43,9 @@ public:
 	/*Cost per seconds*/
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Base Attribute")
 	float SprintCostStamina;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Base Attribute")
+	TArray<TObjectPtr<UAnimMontage>> HitReaction;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Base Attribute/Player Only")
 	float AimFOV;
@@ -71,34 +74,42 @@ public:
 
 	UFUNCTION()
 	virtual void OnBulletHitBind(AActor* hitActor);
+
+	/*On Character Dead/Revive/AllowToStart*/
+	/*Both player and AI may have their own internal logic to trigger*/
+	virtual void OnCharacterDeath();
+	virtual void OnCharacterRevive();
+	virtual void OnCharacterAllowToStart();
+
+	/*Get Trace Start/Direction, easier for weaponcomponent to get the trace info*/
+	virtual FVector GetWeaponTraceStartLocation() const;
+	virtual FVector GetWeaponTraceEndDirection() const;
+
 	// Damageble Interface
 	float GetHealth_Implementation() const override;
 	float GetMaxHealth_Implementation() const override;
-	void RefillHealth_Implementation() override;
-	void ApplyDamage_Implementation(const float DamageValue) override;
+	void RefillHealth_Implementation(float HealthToRefill) override;
+	void AddPoint_Implementation() override;
+	void ApplyDamage_Implementation(const float DamageValue, AActor* DamageSource) override;
 
 	/*Reference Getter*/
 	const FCharacterBaseAttribute& GetCharacterAttribute() const;
 	UWeaponComponent* GetWeaponComponent() const;
 
-	/*On Character Dead/Revive*/
-	virtual void OnCharacterDeath();
-	virtual void OnCharacterRevive();
-	/*A Normalized vector for trace direction*/
-	virtual FVector GetWeaponTraceStartLocation() const;
-	virtual FVector GetWeaponTraceEndDirection() const;
-
+	/*Ragdoll Physic*/
 	void StartRagdoll();
 	void StopRagdoll();
 
 protected:
 	virtual void BeginPlay();
+	void PlayRandomHitReaction();
 
 protected:
 	UPROPERTY(BlueprintReadOnly, Category = "Base Attribute")
 	float Health = 100.0f;
 
-	UPROPERTY(BlueprintReadOnly, Category = "Base Attribute")
+	/*This can be import from data table but since now both AI and player shared the same attribute, then It will just export on Blueprint*/
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Base Attribute")
 	FCharacterBaseAttribute CharacterAttribute;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)

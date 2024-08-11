@@ -1,6 +1,7 @@
 
 #include "Character/WeaponComponent.h"
 #include "Kismet/KismetStringLibrary.h"
+#include "Kismet/GameplayStatics.h"
 #include "WeaponBase.h"
 #include "DamageSystem/Damageable.h"
 #include "NiagaraFunctionLibrary.h"
@@ -9,29 +10,30 @@
 #include "UI/W_PlayerCrosshair.h"
 #include "GameFramework/PlayerState.h"
 #include "Character/TechnicalExerciseCharacter.h"
+#include "Perception/AISense_Hearing.h"
 
 /*Helper function for bullet spread and exponent*/
 FVector VRandConeNormalDistribution(const FVector& Dir, const float ConeHalfAngleRad, const float Exponent)
 {
 	if (ConeHalfAngleRad > 0.f)
 	{
-		const float ConeHalfAngleDegrees = FMath::RadiansToDegrees(ConeHalfAngleRad);
+		const float coneHalfAngleDegrees = FMath::RadiansToDegrees(ConeHalfAngleRad);
 
 		// consider the cone a concatenation of two rotations. one "away" from the center line, and another "around" the circle
 		// apply the exponent to the away-from-center rotation. a larger exponent will cluster points more tightly around the center
-		const float FromCenter = FMath::Pow(FMath::FRand(), Exponent);
-		const float AngleFromCenter = FromCenter * ConeHalfAngleDegrees;
-		const float AngleAround = FMath::FRand() * 360.0f;
+		const float fromCenter = FMath::Pow(FMath::FRand(), Exponent);
+		const float angleFromCenter = fromCenter * coneHalfAngleDegrees;
+		const float angleAround = FMath::FRand() * 360.0f;
 
 		FRotator Rot = Dir.Rotation();
-		FQuat DirQuat(Rot);
-		FQuat FromCenterQuat(FRotator(0.0f, AngleFromCenter, 0.0f));
-		FQuat AroundQuat(FRotator(0.0f, 0.0, AngleAround));
-		FQuat FinalDirectionQuat = DirQuat * AroundQuat * FromCenterQuat;
+		FQuat dirQuat(Rot);
+		FQuat fromCenterQuat(FRotator(0.0f, angleFromCenter, 0.0f));
+		FQuat aroundQuat(FRotator(0.0f, 0.0, angleAround));
+		FQuat finalDirectionQuat = dirQuat * aroundQuat * fromCenterQuat;
 
-		FinalDirectionQuat.Normalize();
+		finalDirectionQuat.Normalize();
 
-		return FinalDirectionQuat.RotateVector(FVector::ForwardVector) * Dir.Size();
+		return finalDirectionQuat.RotateVector(FVector::ForwardVector) * Dir.Size();
 	}
 	else
 	{
@@ -49,10 +51,13 @@ void UWeaponComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
+	/*Initialize reference*/
 	if (GetOwner())
 		m_Owner = Cast<ATechnicalExerciseCharacter>(GetOwner());
 
 	m_WeaponBlueprint.Reset();
+
+	/*Initialize weapon*/
 	InitWeaponList();
 	if (!RandomWeapon) {
 		SetWeapon(DefaultsWeapon);
@@ -66,17 +71,16 @@ void UWeaponComponent::BeginPlay()
 void UWeaponComponent::InitWeaponList()
 {
 	for (EWeaponType type : DefaultsWeaponList) {
-		FStoredWeapon Weapon(FStoredWeapon(type, GetWeaponAttributeRow(type)));
-
-		m_WeaponList.Add(Weapon);
+		FStoredWeapon weapon(FStoredWeapon(type, GetWeaponAttributeRow(type)));
+		m_WeaponList.Add(weapon);
 	}
 }
 
 void UWeaponComponent::DataTableAssetInitialization()
 {
 	//Get datatable
-	static ConstructorHelpers::FObjectFinder<UDataTable> DataTablePath(TEXT("/Script/Engine.DataTable'/Game/DataAsset/DT_Weapon.DT_Weapon'"));
-	m_DataTableAsset = DataTablePath.Object;
+	static ConstructorHelpers::FObjectFinder<UDataTable> dataTablePath(TEXT("/Script/Engine.DataTable'/Game/DataAsset/DT_Weapon.DT_Weapon'"));
+	m_DataTableAsset = dataTablePath.Object;
 }
 
 void UWeaponComponent::SetWeapon(const EWeaponType Type)
@@ -98,11 +102,11 @@ void UWeaponComponent::SetWeapon(const EWeaponType Type)
 		if (UAnimMontage* m = weaponData.Attribute.SwitchWeaponMontage)
 			m_Owner->PlayAnimMontage(m);
 
-		//Set Spawn Collision Handling Override
-		FActorSpawnParameters ActorSpawnParams;
-		ActorSpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-		ActorSpawnParams.Owner = m_Owner.Get();
-		m_WeaponBlueprint = GetWorld()->SpawnActor<AWeaponBase>(weaponData.Attribute.WeaponClass, ActorSpawnParams);
+		//Spawn weapon and attach it to player hand
+		FActorSpawnParameters actorSpawnParams;
+		actorSpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+		actorSpawnParams.Owner = m_Owner.Get();
+		m_WeaponBlueprint = GetWorld()->SpawnActor<AWeaponBase>(weaponData.Attribute.WeaponClass, actorSpawnParams);
 
 		m_WeaponBlueprint->AttachToComponent(m_Owner->GetMesh(),
 			FAttachmentTransformRules::SnapToTargetNotIncludingScale,
@@ -119,10 +123,15 @@ void UWeaponComponent::StartReload()
 {
 	const FStoredWeapon& storedWeapon = GetWeapon(m_CurrentWeapon);
 	if (storedWeapon.CanReload() && !m_Owner->GetMesh()->GetAnimInstance()->Montage_IsPlaying(storedWeapon.Attribute.ReloadMontage)) {
-		//Play Montage instead
-		m_CanShoot = false;
+
+		//Play Montage, the actual value changing will trigger in AnimNotify
 		if (UAnimMontage* reloadMontage = GetWeapon(m_CurrentWeapon).Attribute.ReloadMontage)
 			m_Owner->PlayAnimMontage(reloadMontage);
+
+		//Disable shooting when weapon ammunition was 0. Otherwise, player can cancel the reload action
+		if (GetCurrentWeaponAmmunition() < 0) {
+			m_CanShoot = false;
+		}
 
 	}
 }
@@ -155,8 +164,14 @@ void UWeaponComponent::StartShooting()
 	const FVector traceStart = m_Owner->GetWeaponTraceStartLocation();
 	const FVector traceDirection = m_Owner->GetWeaponTraceEndDirection();
 
-	if (UAnimMontage* ShootMontage = data.Attribute.ShootMontage)
-		m_Owner->PlayAnimMontage(ShootMontage);
+	/*Play Montage*/
+	if (UAnimMontage* shootMontage = data.Attribute.ShootMontage)
+		m_Owner->PlayAnimMontage(shootMontage);
+	/*Play SFX*/
+	if (auto shootVFX = data.Attribute.ShootSFX) {
+		UGameplayStatics::PlaySoundAtLocation(GetWorld(), shootVFX, traceStart);
+		UAISense_Hearing::ReportNoiseEvent(GetWorld(), m_Owner->GetActorLocation(), 1.0f, m_Owner.Get(), 1000.0f);
+	}
 
 	for (int i = 0; i < data.Attribute.BulletPerShoot; i++) {
 
@@ -168,7 +183,7 @@ void UWeaponComponent::StartShooting()
 		TArray<FHitResult> results;
 		FHitResult hit = WeaponTrace(traceStart, finalTraceDirection, results);
 
-		/*Apply damage*/
+		/*Apply damage and spawn effect*/
 		if (!hit.GetActor()) {
 			PlayShootEffect(data.Attribute, m_WeaponBlueprint->GetTraceStart(), finalTraceDirection);
 			continue;
@@ -182,23 +197,24 @@ void UWeaponComponent::StartShooting()
 			if (IDamageable::Execute_GetHealth(hit.GetActor()) <= 0)
 				continue;
 
-			float FinalDamage = 0;
+			//Set final damage to apply
+			float finalDamage = 0;
 			if (hit.BoneName == "head")
-				FinalDamage = data.Attribute.Damage * 2;
+				finalDamage = data.Attribute.Damage * 2;
 			else
-				FinalDamage = data.Attribute.Damage;
+				finalDamage = data.Attribute.Damage;
 
-			IDamageable::Execute_ApplyDamage(hit.GetActor(), FinalDamage);
+			IDamageable::Execute_ApplyDamage(hit.GetActor(), finalDamage, m_Owner.Get());
 
-			PlayHitEffect(data.Attribute, hit.Location, FinalDamage);
+			PlayHitEffect(data.Attribute, hit.Location, finalDamage);
 			OnBulletHit.Broadcast(hit.GetActor());
 		}
 	}
 
 	data.CurrentAmmunition -= 1;
 
-	/*If not hold to shoot or Is a bot, then reset the m_CanShoot after X Rate*/
-	/*Otherwise, for player, it will using StartShooting_Loop, the function below won't trigger*/
+	/*If not hold to shoot or Is a bot, then reset the m_CanShoot after X Shooting Rate*/
+	/*Otherwise, for player, it will using StartShooting_Loop, the functionality below won't trigger*/
 	if (!data.Attribute.HoldToShoot || m_Owner->GetPlayerState()->IsABot()) {
 		m_CanShoot = false;
 
@@ -216,13 +232,13 @@ void UWeaponComponent::StartShooting()
 void UWeaponComponent::StartShooting_Loop()
 {
 	const FStoredWeapon& data = GetWeapon(m_CurrentWeapon);
-
+	/*For player shoot by hold only*/
 	if (data.Attribute.HoldToShoot) {
 		FTimerDelegate tempDelegate;
 		tempDelegate.BindWeakLambda(this, [&]()
 			{
 				StartShooting();
-				UE_LOG(LogTemp, Error, TEXT("Shooting"));
+				//UE_LOG(LogTemp, Error, TEXT("Shooting"));
 			});
 		GetWorld()->GetTimerManager().SetTimer(m_ShootTimer, tempDelegate, data.Attribute.Rate, true);
 	}
@@ -268,18 +284,18 @@ FHitResult UWeaponComponent::WeaponTrace(const FVector& StartTrace, const FVecto
 	if (hitResults.Num() > 0)
 	{
 		// Filter the output list to prevent multiple hits on the same actor;
-		for (FHitResult& CurHitResult : hitResults)
+		for (FHitResult& curHitResult : hitResults)
 		{
-			auto Pred = [&CurHitResult](const FHitResult& Other)
+			auto pred = [&curHitResult](const FHitResult& Other)
 				{
-					return Other.HitObjectHandle == CurHitResult.HitObjectHandle;
+					return Other.HitObjectHandle == curHitResult.HitObjectHandle;
 				};
 
-			if (!OutHitResult.ContainsByPredicate(Pred))
+			if (!OutHitResult.ContainsByPredicate(pred))
 			{
-				OutHitResult.Add(CurHitResult);
+				OutHitResult.Add(curHitResult);
 				if (DebugTime > 0.0f)
-					DrawDebugPoint(GetWorld(), CurHitResult.ImpactPoint, HitPointThickness, FColor::Green, false, DebugTime);
+					DrawDebugPoint(GetWorld(), curHitResult.ImpactPoint, HitPointThickness, FColor::Green, false, DebugTime);
 			}
 		}
 
@@ -300,16 +316,15 @@ void UWeaponComponent::PlayShootEffect(const FWeaponAttribute& WeaponAttribute, 
 		UNiagaraComponent* tracer = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
 			this, tracerSystem, EffectStartLocation, FRotator::ZeroRotator);
 
-		TArray<FVector> ImpactLocation = { ShootEndLocation };
-		UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayVector(tracer, "User.ImpactPositions", ImpactLocation);
+		TArray<FVector> impactLocation = { ShootEndLocation };
+		UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayVector(tracer, "User.ImpactPositions", impactLocation);
 	}
 
 	if (auto muzzle = WeaponAttribute.Muzzle) {
 		UNiagaraComponent* tracer = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
 			this, muzzle, EffectStartLocation, FRotator::ZeroRotator);
-
-
 	}
+
 }
 
 void UWeaponComponent::PlayHitEffect(const FWeaponAttribute& WeaponAttribute, const FVector& ShootEndLocation, const float Damage)
@@ -318,8 +333,8 @@ void UWeaponComponent::PlayHitEffect(const FWeaponAttribute& WeaponAttribute, co
 		UNiagaraComponent* tracer = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
 			this, damageNumber, ShootEndLocation, FRotator::ZeroRotator);
 
-		TArray<FVector4> DamageInfo = { FVector4(ShootEndLocation, Damage) };
-		UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayVector4(tracer, "User.DamageInfo", DamageInfo);
+		TArray<FVector4> damageInfo = { FVector4(ShootEndLocation, Damage) };
+		UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayVector4(tracer, "User.DamageInfo", damageInfo);
 	}
 }
 

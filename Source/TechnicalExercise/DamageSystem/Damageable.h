@@ -19,10 +19,13 @@ class TECHNICALEXERCISE_API IDamageable
 
 public:
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Damage")
-	void ApplyDamage(const float DamageValue);
+	void ApplyDamage(const float DamageValue, AActor* DamageSource);
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Damage")
-	void RefillHealth();
+	void AddPoint();
+
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Damage")
+	void RefillHealth(float HealthToRefill);
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Damage")
 	float GetHealth() const;

@@ -23,6 +23,9 @@ public:
 	const AActor* GetCurrentTarget() const;
 	void OnCharacterDeath();
 	void RestartLogic();
+	void StopLogic();
+	void StartBehaviorTree();
+	void SetTarget(AActor* Target);
 
 protected:
 	UFUNCTION()
@@ -33,7 +36,6 @@ protected:
 	void Tick(float DeltaTime) override;
 
 	void ToggleUseControlRotation(bool bUseControlRotation);
-	void SetTarget(AActor* Target);
 	void ClearTarget();
 
 	void Respawn();

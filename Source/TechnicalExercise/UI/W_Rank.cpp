@@ -32,33 +32,36 @@ void UW_Rank::InitializeArray()
         }
     }
 
+    /*Sort order descending based on point*/
     m_PlayerStateArray.Sort([](const APlayerStateBase& A, const APlayerStateBase& B)
-        {
-            return A.GetPoint() > B.GetPoint();
-        });
+    {
+        return A.GetPoint() > B.GetPoint();
+    });
 }
 
 void UW_Rank::GenerateText()
 {
     for (APlayerStateBase* ps : m_PlayerStateArray) {
         if (ps) {
-            UTextBlock* ScoreEntry = NewObject<UTextBlock>(this);
-            if (ScoreEntry) {
-                ScoreEntry->SetFont(TextSetting);
-                ScoreEntry->SetJustification(ETextJustify::Center);
+            UTextBlock* scoreText = NewObject<UTextBlock>(this);
+            if (scoreText) {
+                scoreText->SetFont(TextSetting);
+                scoreText->SetJustification(ETextJustify::Center);
                 FText textToSet;
                 if(ps->IsABot())
-                    textToSet = FText::FromString(FString::Printf(TEXT("%s                                                          %i"), *ps->GetName(), ps->GetPoint()));
+                    textToSet = FText::FromString(FString::Printf(TEXT("%s                                                          %i"), 
+                        *ps->GetName(), ps->GetPoint()));
                 else {
-                    textToSet = FText::FromString(FString::Printf(TEXT("%s(Player)                                                   %i"), *ps->GetName(), ps->GetPoint()));
+                    textToSet = FText::FromString(FString::Printf(TEXT("%s(Player)                                                  %i"), 
+                        *ps->GetName(), ps->GetPoint()));
                 }
 
-                ScoreEntry->SetText(textToSet);
+                scoreText->SetText(textToSet);
 
-                UVerticalBoxSlot* ScoreSlot = m_ScoreListContainer->AddChildToVerticalBox(ScoreEntry);
-                if (ScoreSlot)
+                UVerticalBoxSlot* scoreSlot = m_ScoreListContainer->AddChildToVerticalBox(scoreText);
+                if (scoreSlot)
                 {
-                    ScoreSlot->SetPadding(FMargin(0.0f,50.0f,0.0f,0.0f));
+                    scoreSlot->SetPadding(FMargin(0.0f,50.0f,0.0f,0.0f));
                 }
             }
         }

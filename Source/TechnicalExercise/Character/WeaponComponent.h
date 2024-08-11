@@ -47,10 +47,6 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon Attribute")
 	float Rate = 1.0;
 
-	/*I wan to add recoil for gun but unfortunately, I don't have enough time*/
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon Attribute")
-	float Recoil = 0.1f;
-
 	/*Consider shotgun and some special case*/
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon Attribute")
 	int BulletPerShoot = 1;
@@ -72,6 +68,9 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon Attribute/VFX")
 	TObjectPtr<UNiagaraSystem> DamageNumber;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon Attribute/SFX")
+	TObjectPtr<USoundBase> ShootSFX;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon Attribute/SpreadExponent", meta = (EditCondition = "BulletPerShoot > 1"))
 	float Exponent = 0;
@@ -142,17 +141,22 @@ public:
 	int GetWeaponAmmunition(const EWeaponType Type) const;
 	int GetMaxWepaonAmmunition(const EWeaponType Type) const;
 
-	/*Weapon functionality*/
+	/*Weapon Attachment*/
 	void SetWeapon(const EWeaponType Type);
-	/*Play Montage*/
+
+	/*Play Reload Montage*/
 	void StartReload();
+
 	/*Do actual reload function*/
 	void ReloadCurrentWeapon();
 	void RefillAllAmmunition();
+
+	/*Start all shooting action, used by player and ai*/
 	void StartShooting();
 	void StartShooting_Loop();
 	void StopShooting_Loop();
 
+	/*Check if continuously shooting*/
 	bool IsShooting() const;
 	bool CanShoot() const;
 
@@ -188,14 +192,16 @@ public:
 protected:
 	virtual void BeginPlay() override;
 
+	/*VFX and SFX trigger*/
 	void PlayShootEffect(const FWeaponAttribute& WeaponAttribute,const FVector& ShootStartLocation, const FVector& ShootEndLocation);
 	void PlayHitEffect(const FWeaponAttribute& WeaponAttribute, const FVector& ShootEndLocation, const float Damage);
 	
 private:
 	/*Data Asset getter and initialization*/
 	void DataTableAssetInitialization();
-	const FWeaponAttribute& GetWeaponAttributeRow(const TEnumAsByte<EWeaponType> Type) const;
 	void InitWeaponList();
+	const FWeaponAttribute& GetWeaponAttributeRow(const TEnumAsByte<EWeaponType> Type) const;
+
 	/*Core logic of weapon trace*/
 	FHitResult WeaponTrace(const FVector& StartTrace, const FVector& EndTrace, TArray<FHitResult>& OutHitResult) const;
 
@@ -204,10 +210,10 @@ private:
 private:
 	/*Reference*/
 	TArray<FStoredWeapon> m_WeaponList;
-	TWeakObjectPtr<UDataTable> m_DataTableAsset;
 	TEnumAsByte<EWeaponType> m_CurrentWeapon = EWeaponType::None;
-	TWeakObjectPtr<AWeaponBase> m_WeaponBlueprint;
 
+	TWeakObjectPtr<UDataTable> m_DataTableAsset;
+	TWeakObjectPtr<AWeaponBase> m_WeaponBlueprint;
 	TWeakObjectPtr<ATechnicalExerciseCharacter> m_Owner;
 
 	FTimerHandle m_ShootTimer;

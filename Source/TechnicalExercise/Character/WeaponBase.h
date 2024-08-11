@@ -18,12 +18,16 @@ public:
 	FVector GetTraceStart() const;
 
 protected:
+	/*Having DefaultsSceneRoot will be easier for designer to gauge and adjust weapon mesh transform*/
 	UPROPERTY(EditDefaultsOnly)
 	TObjectPtr<USceneComponent> ShootPointComponent;
 
+	/*The defaults trace start location*/
+	/*The tracer vfx will using the location from this ShootPointComponent as well*/
 	UPROPERTY(EditDefaultsOnly)
 	TObjectPtr<USceneComponent> DefaultsSceneRoot;
 
+	/*Indicate the forward vector for weapon, easier to adjust the weapon position in blueprint*/
 	UPROPERTY(EditDefaultsOnly)
 	TObjectPtr<UArrowComponent> ArrowComponent;
 

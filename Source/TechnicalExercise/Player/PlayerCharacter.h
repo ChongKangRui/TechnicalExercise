@@ -9,6 +9,8 @@
 class ATE_PlayerController;
 class UW_PlayerCrosshair;
 class ATechnicalExerciseGameMode;
+class UW_StartTimer;
+class UW_HealthBar;
 
 UCLASS()
 class TECHNICALEXERCISE_API APlayerCharacter : public ATechnicalExerciseCharacter
@@ -25,12 +27,27 @@ public:
 
 	void BeginPlay() override;
 	void OnCharacterRevive() override;
+	void OnCharacterAllowToStart() override;
 protected:
+
+	/*Player weapon trace direction is different with normal character, it take from camera instead*/
+	FVector GetWeaponTraceStartLocation() const override;
+	FVector GetWeaponTraceEndDirection() const override;
+
+	void OnCharacterDeath() override;
+
+	/*Interface*/
+	float GetStamina_Implementation() const override;
+	float GetMaxStamina_Implementation() const override;
+
 	/*Move Control*/
 	void Move(const FInputActionValue& Value);
 
 	/*Look Control*/
 	void Look(const FInputActionValue& Value);
+
+	/*Jump*/
+	void CharacterJump();
 
 	/*Sprint Control*/
 	void StartSprint();
@@ -51,7 +68,6 @@ protected:
 
 	/*Reload or respawn input*/
 	void ReloadOrRespawn();
-	void StopRespawn();
 
 	/*Open/Close Scoreboard*/
 	void OpenScoreboard();
@@ -59,16 +75,6 @@ protected:
 
 	/*Helper function to stop any timer*/
 	void StopTimer(FTimerHandle&  Handle);
-
-	/*Interface*/
-	float GetStamina_Implementation() const override;
-	float GetMaxStamina_Implementation() const override;
-
-	/*Player weapon trace direction is different with normal character, it take from camera instead*/
-	FVector GetWeaponTraceStartLocation() const override;
-	FVector GetWeaponTraceEndDirection() const override;
-
-	void OnCharacterDeath() override;
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
@@ -88,17 +94,22 @@ private:
 	FTimerHandle m_SprintStaminaCostTimer;
 	FTimerHandle m_StaminaRegenTimer;
 	FTimerHandle m_AimTimer;
-	FTimerHandle m_RespawnTimer;
-
+	
 	TSubclassOf<UUserWidget> m_CrosshairWidgetClass;
 	TSubclassOf<UUserWidget> m_ScoreboardWidgetClass;
+	TSubclassOf<UUserWidget> m_EventTimerWidgetClass;
+	TSubclassOf<UUserWidget> m_PlayerHealthWidgetClass;
+
 	TWeakObjectPtr<UW_PlayerCrosshair> m_PlayerCrosshair;
 	TWeakObjectPtr<UUserWidget> m_Scoreboard;
+	TWeakObjectPtr<UW_StartTimer> m_EventTimer;
+	TWeakObjectPtr<UW_HealthBar> m_HealthBar;
 
 	TObjectPtr<ATechnicalExerciseGameMode> m_GameMode;
 
 	bool m_IsAiming = false;
 	bool m_DisableControl = false;
+	bool m_CanRespawn = false;
 	/*Use friend for player controller, so it can access all the control functionality to the player character*/
 	friend ATE_PlayerController;
 };
